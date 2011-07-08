@@ -247,7 +247,24 @@ int SDL_SetAlpha(SDL_Surface *surface, Uint32 flag, Uint8 alpha) {
 }
 
 int SDL_UpperBlit(SDL_Surface *src, SDL_Rect *srcrect, SDL_Surface *dst, SDL_Rect *dstrect) {
-	//TRACE;
+	int x, y, w, h;
+	if (srcrect) {
+		w = srcrect->w;
+		h = srcrect->h;
+	}
+	else {
+		w = src->w;
+		h = src->h;
+	}
+	if (dstrect) {
+		x = dstrect->x;
+		y = dstrect->y;
+	}
+	else {
+		x = y = 0;
+	}
+	printf("Blitting %d (%dx%d) into %d @ %d, %d\n", src->offset, w, h, dst->offset, x, y);
+	/* Supposed to save clipped rect into dstrect */
 	return 0;
 }
 
