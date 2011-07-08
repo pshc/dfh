@@ -4,12 +4,16 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 #define TRACE do { puts( __func__ ); fflush(stdout); } while (0)
 
+static struct timeval start_time;
+
 int SDL_Init(Uint32 flags) {
 	TRACE;
+	gettimeofday(&start_time, NULL);
 	return 0;
 }
 
@@ -62,10 +66,10 @@ int SDL_ShowCursor(int toggle) {
 }
 
 Uint32 SDL_GetTicks(void) {
-	TRACE;
-	static Uint32 ticks = 0;
-	ticks += 16;
-	return ticks;
+	//TRACE;
+	struct timeval now;
+	gettimeofday(&now, NULL);
+	return (now.tv_sec - start_time.tv_sec) * 1000 + (now.tv_usec - start_time.tv_usec) / 1000;
 }
 
 int SDL_PollEvent(SDL_Event *event) {
@@ -83,7 +87,7 @@ int SDL_PollEvent(SDL_Event *event) {
 }
 
 Uint8 SDL_GetAppState(void) {
-	TRACE;
+	//TRACE;
 	//return SDL_APPMOUSEFOCUS | SDL_APPINPUTFOCUS | SDL_APPACTIVE;
 	return SDL_APPINPUTFOCUS | SDL_APPACTIVE;
 }
@@ -99,7 +103,7 @@ Uint8 SDL_GetMouseState(int *x, int *y) {
 }
 
 int SDL_NumJoysticks(void) {
-	TRACE;
+	//TRACE;
 	return 0;
 }
 
