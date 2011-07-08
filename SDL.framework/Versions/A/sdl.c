@@ -276,6 +276,8 @@ void SDL_UnlockSurface(SDL_Surface *surface) {
 
 /* THREADING */
 
+#define SEM_TRACE ((void)0)
+
 Uint32 SDL_ThreadID(void) {
 	TRACE;
 	assert(sizeof(pthread_t) == sizeof(Uint32));
@@ -299,7 +301,7 @@ static void *boing(void *context) {
 }
 
 SDL_Thread *SDL_CreateThread(int (*fn)(void *), void *data) {
-	TRACE;
+	//TRACE;
 	pthread_t thread;
 	struct bounce *bounce = malloc(sizeof *bounce);
 	bounce->fn = fn;
@@ -320,7 +322,7 @@ struct SDL_semaphore {
 };
 
 SDL_sem *SDL_CreateSemaphore(Uint32 initial_value) {
-	TRACE;
+	SEM_TRACE;
 	SDL_sem *sem = malloc(sizeof *sem);
 	if (pthread_mutex_init(&sem->mutex, NULL) != 0) {
 		fprintf(stderr, "Mutex creation failed.\n");
@@ -338,7 +340,7 @@ SDL_sem *SDL_CreateSemaphore(Uint32 initial_value) {
 }
 
 int SDL_SemWait(SDL_sem *sem) {
-	TRACE;
+	SEM_TRACE;
 	int res = pthread_mutex_lock(&sem->mutex);
 	if (res != 0) {
 		if (res == EDEADLK)
@@ -361,7 +363,7 @@ int SDL_SemWait(SDL_sem *sem) {
 }
 
 int SDL_SemPost(SDL_sem *sem) {
-	TRACE;
+	SEM_TRACE;
 	int res = pthread_mutex_lock(&sem->mutex);
 	if (res != 0) {
 		if (res == EDEADLK)
@@ -377,7 +379,7 @@ int SDL_SemPost(SDL_sem *sem) {
 }
 
 int SDL_SemTryWait(SDL_sem *sem) {
-	TRACE;
+	SEM_TRACE;
 	int res = pthread_mutex_trylock(&sem->mutex);
 	if (res != 0) {
 		if (res == EBUSY)
