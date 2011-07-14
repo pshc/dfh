@@ -6,15 +6,18 @@
 #include <string.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include "conn.h"
 
 #define TRACE do { puts( __func__ ); fflush(stdout); } while (0)
 
 static struct timeval start_time;
+static struct conn *conn;
 
 int SDL_Init(Uint32 flags) {
 	TRACE;
 	gettimeofday(&start_time, NULL);
-	return 0;
+	conn = init_conn();
+	return conn ? 0 : -1;
 }
 
 int SDL_InitSubSystem(Uint32 flags) {
@@ -73,7 +76,7 @@ Uint32 SDL_GetTicks(void) {
 }
 
 int SDL_PollEvent(SDL_Event *event) {
-	TRACE;
+	//TRACE;
 	/*
 	if (anevent) {
 		if (event) {
@@ -108,7 +111,13 @@ int SDL_NumJoysticks(void) {
 }
 
 void SDL_Delay(Uint32 ms) {
-	usleep(ms);
+	Uint32 begin = SDL_GetTicks();
+	if (conn_poll(conn, (int) ms)) {
+		/* Got an event before timeout elapsed */
+		Uint32 elapsed = SDL_GetTicks() - begin;
+		if (elapsed < ms)
+			usleep((ms - elapsed) * 1000);
+	}
 }
 
 /* WINDOW */
@@ -163,7 +172,7 @@ SDL_Surface *SDL_GetVideoSurface(void) {
 }
 
 int SDL_Flip(SDL_Surface *screen) {
-	TRACE;
+	send_flip(conn);
 	return 0;
 }
 
@@ -263,7 +272,9 @@ int SDL_UpperBlit(SDL_Surface *src, SDL_Rect *srcrect, SDL_Surface *dst, SDL_Rec
 	else {
 		x = y = 0;
 	}
-	printf("Blitting %d (%dx%d) into %d @ %d, %d\n", src->offset, w, h, dst->offset, x, y);
+	if (dst == video_surface) {
+		send_blit(conn, src->offset, x/40, y/18);
+	}
 	/* Supposed to save clipped rect into dstrect */
 	return 0;
 }
