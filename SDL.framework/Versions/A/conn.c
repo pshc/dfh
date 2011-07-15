@@ -1,3 +1,4 @@
+#include <arpa/inet.h>
 #include <errno.h>
 #include <pthread.h>
 #include <stdint.h>
@@ -12,18 +13,22 @@
 struct conn {
 	void *ctx;
 	pthread_key_t key;
+	uint16_t screen[80][25];
+	int dirty;
 };
 
 static int send_msg(struct conn *conn, const uint8_t *buf, size_t len);
 
 void send_blit(struct conn *conn, int tile, int x, int y) {
-	uint8_t buf[] = {BLIT, HI(tile), LO(tile), LO(x), LO(y)};
-	send_msg(conn, buf, sizeof buf);
+	conn->screen[x][y] = htons((uint16_t) tile);
+	conn->dirty = 1;
 }
 
 void send_flip(struct conn *conn) {
-	uint8_t buf = FLIP;
-	send_msg(conn, &buf, sizeof buf);
+	if (!conn->dirty)
+		return;
+	send_msg(conn, (uint8_t *) conn->screen, sizeof conn->screen);
+	conn->dirty = 0;
 }
 
 static void sock_dtor(void *sock) {
@@ -41,6 +46,8 @@ struct conn *init_conn(void) {
 	}
 	conn->ctx = ctx;
 	pthread_key_create(&conn->key, sock_dtor);
+	memset(conn->screen, 0, sizeof conn->screen);
+	conn->dirty = 1;
 	return conn;
 }
 
