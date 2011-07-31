@@ -7,6 +7,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include "conn.h"
+#include "sdl.h"
 
 #define TRACE do { puts( __func__ ); fflush(stdout); } while (0)
 
@@ -156,12 +157,13 @@ const SDL_VideoInfo *SDL_GetVideoInfo(void) {
 	return &video_info;
 }
 
+static SDL_Surface *create_surface(Uint32 flags, int width, int height, int depth);
 static SDL_Surface *video_surface = NULL;
 
 SDL_Surface *SDL_SetVideoMode(int width, int height, int bpp, Uint32 flags) {
 	TRACE;
 	if (!video_surface)
-		video_surface = SDL_CreateRGBSurface(flags, width, height, bpp, 0, 0, 0, 0);
+		video_surface = create_surface(flags, width, height, bpp);
 	return video_surface;
 }
 
@@ -178,16 +180,11 @@ int SDL_Flip(SDL_Surface *screen) {
 
 /* PIXELS */
 
-SDL_Surface *SDL_CreateRGBSurface(Uint32 flags, int width, int height, int depth, Uint32 Rmask, Uint32 Gmask, Uint32 Bmask, Uint32 Amask) {
-	//TRACE;
+static SDL_Surface *create_surface(Uint32 flags, int width, int height, int depth) {
 	SDL_PixelFormat *f = calloc(1, sizeof *f);
 	if (!f)
 		return NULL;
 	f->palette = NULL;
-	f->Rmask = Rmask;
-	f->Gmask = Gmask;
-	f->Bmask = Bmask;
-	f->Amask = Amask;
 	f->BitsPerPixel = depth;
 	f->BytesPerPixel = depth/8;
 
@@ -216,6 +213,26 @@ SDL_Surface *SDL_CreateRGBSurface(Uint32 flags, int width, int height, int depth
 	return s;
 }
 
+SDL_Surface *SDL_CreateRGBSurface(Uint32 flags, int width, int height, int depth, Uint32 Rmask, Uint32 Gmask, Uint32 Bmask, Uint32 Amask) {
+	struct private_hwdata *hwdata = calloc(1, sizeof *hwdata);
+	if (!hwdata)
+		return NULL;
+	hwdata->refcount = 1;
+
+	SDL_Surface *s = create_surface(flags, width, height, depth);
+	if (!s) {
+		free(hwdata);
+		return NULL;
+	}
+	s->hwdata = hwdata;
+	SDL_PixelFormat *f = s->format;
+	f->Rmask = Rmask;
+	f->Gmask = Gmask;
+	f->Bmask = Bmask;
+	f->Amask = Amask;
+	return s;
+}
+
 Uint32 SDL_MapRGB(const SDL_PixelFormat * const fmt, const Uint8 r, const Uint8 g, const Uint8 b) {
 	//TRACE;
 	return 0xffffffff;
@@ -230,10 +247,14 @@ int SDL_SetColorKey(SDL_Surface *surface, Uint32 flag, Uint32 key) {
 SDL_Surface *SDL_ConvertSurface(SDL_Surface *src, SDL_PixelFormat *fmt, Uint32 flags) {
 	TRACE;
 	assert(fmt->BitsPerPixel && fmt->BitsPerPixel % 8 == 0);
-	SDL_Surface *dest = SDL_CreateRGBSurface(flags, src->w, src->h, fmt->BitsPerPixel, 0, 0, 0, 0);
+	SDL_Surface *dest = create_surface(flags, src->w, src->h, fmt->BitsPerPixel);
 	if (!dest)
 		return NULL;
 	memmove(dest->format, fmt, sizeof *fmt);
+	if (src->hwdata) {
+		src->hwdata->refcount++;
+		dest->hwdata = src->hwdata;
+	}
 	return dest;
 }
 
@@ -243,6 +264,11 @@ void SDL_FreeSurface(SDL_Surface *surface) {
 		return;
 	if (0 == --surface->refcount) {
 		printf("Free surface %d\n", surface->offset);
+		struct private_hwdata *hwdata = surface->hwdata;
+		if (hwdata && !--hwdata->refcount) {
+			free(hwdata->filename);
+			free(hwdata);
+		}
 		free(surface->format);
 		free(surface->pixels);
 		free(surface);
@@ -274,6 +300,9 @@ int SDL_UpperBlit(SDL_Surface *src, SDL_Rect *srcrect, SDL_Surface *dst, SDL_Rec
 	}
 	if (dst == video_surface) {
 		send_blit(conn, src->offset, x/40, y/18);
+	}
+	else if (src->hwdata && src->hwdata->filename) {
+		printf("Blitted from %s\n", src->hwdata->filename);
 	}
 	/* Supposed to save clipped rect into dstrect */
 	return 0;
